@@ -2,6 +2,7 @@
 import os
 import numpy as np
 from tqdm.auto import tqdm
+import cv2
 
 ######################################################################################
 
@@ -267,6 +268,8 @@ def reconstruct_patches(region_info_list, original_image):
 						reconstructed_image[i, j] = label
 						region_placements[(i, j)] = label
 
-	return reconstructed_image
+	reconstructed_image_resized = cv2.resize(reconstructed_image, (original_image_shape[1], original_image_shape[0]), interpolation=cv2.INTER_NEAREST)
+
+	return reconstructed_image_resized
 
 ######################################################################################
