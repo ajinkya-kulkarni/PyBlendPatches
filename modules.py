@@ -220,13 +220,10 @@ def generate_bbox_list(window_coords, border_cleaned_predicted_labels, min_area_
 
 ######################################################################################
 
-def reconstruct_patches(region_info_list):
+def reconstruct_patches(region_info_list, original_image):
 
 	# Determine the dimensions of the original image
-	max_x = max(info['bbox'][3] for info in region_info_list)
-	max_y = max(info['bbox'][2] for info in region_info_list)
-
-	original_image_shape = (max_y, max_x)
+	original_image_shape = original_image.shape
 
 	# Initialize an empty array for the reconstructed image
 	reconstructed_image = np.zeros(original_image_shape, dtype=np.int16)
