@@ -122,6 +122,8 @@ def nms_without_scores(regions, iou_threshold=0.5):
 
 ######################################################################################
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from skimage.draw import rectangle_perimeter
 
@@ -134,7 +136,7 @@ def visualize_bboxes(normalized_image, region_info_list):
 	# Draw the bounding boxes and centers on the canvas
 	for region_info in region_info_list:
 		# Draw the bbox on the canvas
-		rr, cc = rectangle_perimeter(start=(region_info['bbox'][0], region_info['bbox'][1]), end=(region_info['bbox'][2]-1, region_info['bbox'][3]-1),shape=canvas.shape)
+		rr, cc = rectangle_perimeter(start=(region_info['bbox'][0], region_info['bbox'][1]), end=(region_info['bbox'][2]-1, region_info['bbox'][3]-1), shape=canvas.shape)
 		canvas[rr, cc] = 255  # Draw white rectangle
 		
 		# Mark the center on the canvas
@@ -150,12 +152,17 @@ def visualize_bboxes(normalized_image, region_info_list):
 	# Overlay the bounding boxes in red
 	normalized_image_color[canvas == 255] = [255, 0, 0]  # Red color
 
-	# Show the original image with overlays
-	plt.figure(figsize=(8, 8))
-	plt.imshow(normalized_image_color)
-	plt.xticks([])
-	plt.yticks([])
-	plt.show()
+	# Instead of showing the image, return it as an image object
+	fig, ax = plt.subplots(figsize=(8, 8))
+	ax.imshow(normalized_image_color)
+	ax.set_xticks([])
+	ax.set_yticks([])
+
+	# Remove the axes
+	ax.axis('off')
+
+	# Return the figure object
+	return fig
 
 ######################################################################################
 
