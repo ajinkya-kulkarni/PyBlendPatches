@@ -139,8 +139,8 @@ def visualize_bboxes(normalized_image, region_info_list):
 		rr, cc = rectangle_perimeter(start=(region_info['bbox'][0], region_info['bbox'][1]), end=(region_info['bbox'][2]-1, region_info['bbox'][3]-1), shape=canvas.shape)
 		canvas[rr, cc] = 255  # Draw white rectangle
 		
-		# Mark the center on the canvas
-		canvas[int(region_info['global_center'][1]), int(region_info['global_center'][0])] = 255
+		# # Mark the center on the canvas
+		# canvas[int(region_info['global_center'][1]), int(region_info['global_center'][0])] = 255
 
 	# Overlay the canvas on the normalized image
 	# Create an RGB version of the normalized image if it's not already in that format
