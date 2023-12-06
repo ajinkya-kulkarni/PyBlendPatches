@@ -96,7 +96,7 @@ def compute_iou(boxA, boxB):
 
 def nms_without_scores(regions, iou_threshold=0.5):
 	# Sort the regions by area in descending order
-	regions = sorted(regions, key=lambda x: x['area'], reverse=True)
+	regions = sorted(regions, key=lambda x: x['label'], reverse=True)
 
 	# List to hold regions that survive NMS
 	nms_regions = []
@@ -116,7 +116,7 @@ def nms_without_scores(regions, iou_threshold=0.5):
 
 	# If NMS resulted in no regions due to suppression, add back the largest one
 	if not nms_regions:
-		nms_regions.append(sorted(regions, key=lambda x: x['area'], reverse=True)[0])
+		nms_regions.append(sorted(regions, key=lambda x: x['label'], reverse=True)[0])
 
 	return nms_regions
 
@@ -231,8 +231,6 @@ def reconstruct_patches(region_info_list, original_image):
 					if binary_image_array[i - minr, j - minc] != 0:
 						reconstructed_image[i, j] = label
 						region_placements[(i, j)] = label
-
-	# reconstructed_image_resized = cv2.resize(reconstructed_image, (original_image_shape[1], original_image_shape[0]), interpolation=cv2.INTER_NEAREST)
 
 	return reconstructed_image
 
