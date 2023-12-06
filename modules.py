@@ -172,6 +172,7 @@ def generate_bbox_list(window_coords, border_cleaned_predicted_labels, min_area_
 
 				# Add the area, global center, bbox, and image array to the list
 				region_info = {
+					'label': label,
 					'area': area,
 					'global_center': (global_center_x, global_center_y),
 					'bbox': global_bbox,
