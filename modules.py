@@ -122,38 +122,6 @@ def nms_without_scores(regions, iou_threshold=0.5):
 
 ######################################################################################
 
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from skimage.draw import rectangle_perimeter
-
-def visualize_bboxes(normalized_image, region_info_list):
-	# Convert normalized image to an 8-bit format and ensure it's in RGB format
-	display_image = (normalized_image * 255).astype(np.uint8)
-	if display_image.ndim == 2:
-		display_image = np.stack((display_image,) * 3, axis=-1)
-
-	# Draw bounding boxes and centers directly on the image
-	for region_info in region_info_list:
-		rr, cc = rectangle_perimeter(start=(region_info['bbox'][0], region_info['bbox'][1]), end=(region_info['bbox'][2] - 1, region_info['bbox'][3] - 1), shape=display_image.shape[:2])
-		display_image[rr, cc] = [255, 0, 0]  # Red for bounding box
-		center_y, center_x = map(int, region_info['global_center'])
-		display_image[center_y, center_x] = [255, 0, 0]  # Red for center
-
-	# Instead of showing the image, return it as an image object
-	fig, ax = plt.subplots(figsize=(8, 8))
-	ax.imshow(display_image)
-	ax.set_xticks([])
-	ax.set_yticks([])
-
-	# Remove the axes
-	ax.axis('off')
-
-	# Return the figure object
-	return fig
-
-######################################################################################
-
 from skimage import measure
 
 def generate_bbox_list(window_coords, border_cleaned_predicted_labels, min_area_threshold = 20):
