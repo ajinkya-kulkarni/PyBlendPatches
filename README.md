@@ -11,7 +11,7 @@ Figure 1: Original Image
 ![](https://github.com/ajinkya-kulkarni/PyBlendPatches/blob/main/image.png)
 
 Figure 2: Image Decomposition
-- The image is decomposed into overlapping patches. This crucial step enables the processing of smaller, manageable regions of large images.
+- The image is decomposed into overlapping patches. This crucial step then enables the processing of smaller, manageable regions of large images.
 
 Figure 3: Segmentation Predictions
 - Predicted segmentation masks for each patch with different colors representing distinct blobs identified by the model.
