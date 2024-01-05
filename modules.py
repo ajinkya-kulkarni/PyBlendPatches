@@ -1,8 +1,115 @@
 
-import os
 import numpy as np
-from tqdm.auto import tqdm
+
+######################################################################################
+
+from PIL import Image
+
+def read_image_as_grayscale_then_MinMax_normalize(image_path):
+
+	image = Image.open(image_path).convert('L')
+	img_array = np.asarray(image, dtype=np.float32)
+	
+	min_val = img_array.min()
+	max_val = img_array.max()
+	
+	if max_val - min_val > 0:
+		normalized_img = (img_array - min_val) / (max_val - min_val)
+	else:
+		raise ValueError('Image has no variance, it might be empty or corrupted')
+	
+	return normalized_img
+
+######################################################################################
+
+import matplotlib
+import colorsys
+
+def random_label_cmap(n=2**16, h = (0,1), l = (.4,1), s =(.2,.8)):
+
+	h,l,s = np.random.uniform(*h,n), np.random.uniform(*l,n), np.random.uniform(*s,n)
+	cols = np.stack([colorsys.hls_to_rgb(_h,_l,_s) for _h,_l,_s in zip(h,l,s)], axis=0)
+	cols[0] = 0
+
+	random_label_cmap = matplotlib.colors.ListedColormap(cols)
+
+	return random_label_cmap
+
+######################################################################################
+
 import cv2
+
+def smooth_segmented_labels(image):
+	"""
+	Smooths the segmented labels in an image using convex hull and replaces each label with its smoothed version.
+
+	Parameters:
+		image (numpy.ndarray): The input segmented image array (grayscale).
+
+	Returns:
+		numpy.ndarray: The image array with smoothed labels, as uint16.
+	"""
+	# Ensure the image is in the correct format
+	if len(image.shape) != 2:
+		raise ValueError("Input image must be a grayscale image")
+
+	# Initialize the output image
+	smoothed_image = np.zeros_like(image)
+
+	# Unique labels in the image (excluding background)
+	unique_labels = np.unique(image)
+	unique_labels = unique_labels[unique_labels != 0]
+
+	for label in unique_labels:
+		# Create a binary mask for the current label
+		label_mask = (image == label).astype(np.uint8)
+
+		# Find contours for this label
+		contours, _ = cv2.findContours(label_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+		# Calculate convex hull for each contour and draw it in the output image
+		for contour in contours:
+			hull = cv2.convexHull(contour)
+			cv2.drawContours(smoothed_image, [hull], -1, int(label), thickness=cv2.FILLED)
+
+	return smoothed_image.astype(np.uint16)  # Ensure output is uint16
+
+######################################################################################
+
+from skimage import measure
+
+def compile_label_info(predicted_labels, window_coords, min_area_threshold = 20):
+	all_labels_info = []
+	new_label_id = 1  # Initialize label ID counter
+
+	for patch_labels, (x_offset, y_offset, _, _) in zip(predicted_labels, window_coords):
+		for region in measure.regionprops(patch_labels):
+			area = region.area
+
+			if area > min_area_threshold:
+				# Calculate global centroid
+				local_centroid_y, local_centroid_x = region.centroid
+				global_center_x = local_centroid_x + x_offset
+				global_center_y = local_centroid_y + y_offset
+
+				# Calculate global bounding box
+				minr, minc, maxr, maxc = region.bbox
+				global_bbox = (minc + x_offset, minr + y_offset, maxc + x_offset, maxr + y_offset)
+
+				# Extract the binary image of the label within its local bounding box
+				label_image = new_label_id * region.image.astype(int)
+
+				label_info = {
+					'label_id': new_label_id,
+					'global_centroid': (global_center_x, global_center_y),
+					'global_bbox': global_bbox,
+					'label_image': label_image
+				}
+				all_labels_info.append(label_info)
+
+				new_label_id += 1  # Increment label ID for the next entry
+
+	return all_labels_info
 
 ######################################################################################
 
@@ -33,205 +140,79 @@ def patchify(image, window_size, overlap):
 
 ######################################################################################
 
-def remove_border_labels(label_image, patch_coords, original_image, neutral_value=0):
-	"""
-	Remove labels at the borders of the patch, unless the border is shared with the original image.
+import matplotlib.pyplot as plt
 
-	Parameters:
-	- label_image: An array where each connected region is assigned a unique integer label.
-	- patch_coords: A tuple (x1, y1, x2, y2) indicating the coordinates of the patch within the original image.
-	- image_shape: The shape (height, width) of the original image.
-	- neutral_value: The value to assign to removed labels.
+def visualize_patches(windows, window_coords, which_cmap, file_path):
+	# Determine the number of unique x and y coordinates
+	unique_x = sorted(set(coord[0] for coord in window_coords))
+	unique_y = sorted(set(coord[1] for coord in window_coords))
 
-	Returns:
-	- An array of the same shape as `label_image` with the appropriate border labels removed.
-	"""
-	x1, y1, x2, y2 = patch_coords
-	height, width = original_image.shape
-	border_labels = set()
+	num_cols = len(unique_x)
+	num_rows = len(unique_y)
 
-	# Check each border and add labels to remove if not at the edge of the original image
-	if y1 != 0:
-		border_labels.update(label_image[0, :])
-	if y2 != height:
-		border_labels.update(label_image[-1, :])
-	if x1 != 0:
-		border_labels.update(label_image[:, 0])
-	if x2 != width:
-		border_labels.update(label_image[:, -1])
+	# Create a figure with the calculated number of subplots
+	fig, axes = plt.subplots(num_rows, num_cols, figsize=(10, 10))
 
-	# Create a mask of regions to remove
-	border_mask = np.isin(label_image, list(border_labels))
+	# Flatten the axes array for easy indexing
+	axes_flat = axes.flatten() if num_rows * num_cols > 1 else [axes]
 
-	# Set the border labels to neutral_value (background)
-	cleaned_label_image = label_image.copy()
-	cleaned_label_image[border_mask] = neutral_value
+	# Map each window to the correct position in the grid
+	for window, coord in zip(windows, window_coords):
+		row = unique_y.index(coord[1])
+		col = unique_x.index(coord[0])
+		ax = axes[row, col] if num_rows * num_cols > 1 else axes
+		ax.imshow(window, cmap=which_cmap)
+		ax.axis('off')  # Turn off axis
 
-	return cleaned_label_image
+	# Turn off any unused subplots
+	for j in range(len(windows), num_rows*num_cols):
+		axes_flat[j].axis('off')
+
+	plt.savefig(file_path, dpi = 300, bbox_inches = 'tight')
+	plt.close()
 
 ######################################################################################
 
-def compute_iou(boxA, boxB):
-	# Determine the coordinates of the intersection rectangle
-	xA = max(boxA[0], boxB[0])
-	yA = max(boxA[1], boxB[1])
-	xB = min(boxA[2], boxB[2])
-	yB = min(boxA[3], boxB[3])
+def non_maximum_suppression(boxes, overlapThresh):
+	if len(boxes) == 0:
+		return []
 
-	# Compute the area of intersection
-	interArea = max(0, xB - xA) * max(0, yB - yA)
+	# Initialize the list of selected indices
+	selected_indices = []
 
-	# Compute the area of both the prediction and ground-truth rectangles
-	boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
-	boxBArea = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
+	# Sort the boxes by the bottom-right y-coordinate (y2)
+	sorted_indices = np.argsort([box[3] for box in boxes])
 
-	# Compute the intersection over union by taking the intersection
-	# area and dividing it by the sum of prediction + ground-truth
-	# areas - the interesection area
-	iou = interArea / float(boxAArea + boxBArea - interArea)
+	while len(sorted_indices) > 0:
+		# Select the box with the largest y2 and remove it from sorted_indices
+		current_index = sorted_indices[-1]
+		selected_indices.append(current_index)
+		sorted_indices = sorted_indices[:-1]
 
-	return iou
+		for other_index in sorted_indices.copy():
+			if does_overlap(boxes[current_index], boxes[other_index], overlapThresh):
+				# Remove indices that overlap too much with the current box
+				sorted_indices = sorted_indices[sorted_indices != other_index]
 
-######################################################################################
-
-def nms_without_scores(regions, iou_threshold=0.5):
-	# Sort the regions by area in descending order
-	regions = sorted(regions, key=lambda x: x['label'], reverse=True)
-
-	# List to hold regions that survive NMS
-	nms_regions = []
-
-	while regions:
-		# Select the region with the largest area and remove from list
-		chosen_region = regions.pop(0)
-		nms_regions.append(chosen_region)
-
-		# Compare this region with all others, suppress if necessary
-		regions = [region for region in regions if compute_iou(chosen_region['bbox'], region['bbox']) < iou_threshold]
-
-		# If there are no regions left to compare and we have not added any regions, break the loop to ensure we return at least one
-		if not regions and not nms_regions:
-			nms_regions.append(chosen_region)
-			break
-
-	# If NMS resulted in no regions due to suppression, add back the largest one
-	if not nms_regions:
-		nms_regions.append(sorted(regions, key=lambda x: x['label'], reverse=True)[0])
-
-	return nms_regions
+	return selected_indices
 
 ######################################################################################
 
-from skimage import measure
+def does_overlap(box1, box2, overlapThresh):
+	# Calculate the intersection of two boxes
+	x_min = max(box1[0], box2[0])
+	y_min = max(box1[1], box2[1])
+	x_max = min(box1[2], box2[2])
+	y_max = min(box1[3], box2[3])
 
-def generate_bbox_list(window_coords, border_cleaned_predicted_labels, min_area_threshold = 20):
+	# Calculate area of intersection
+	intersection_area = max(0, x_max - x_min) * max(0, y_max - y_min)
 
-	# Initialize list to store the results
-	region_info_list = []
+	# Calculate area of both boxes
+	box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
+	box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
 
-	labels_array = border_cleaned_predicted_labels
-
-	# Analyze each patch
-	for i in range(len(labels_array)):
-		# Get the properties of the labeled regions in the patch
-		regions = measure.regionprops(labels_array[i])
-		patch_coord = window_coords[i]  # (x_min, y_min, x_max, y_max)
-
-		# Iterate through each labeled region and extract properties
-		for region in regions:
-			# Area of the region
-			area = region.area
-			
-			# Check if the area is greater than or equal to the threshold
-			if area > min_area_threshold:
-				# Local center of mass (centroid) of the region
-				local_center = region.centroid  
-				# Local bounding box of the region
-				local_bbox = region.bbox  
-				# Label of the region
-				label = region.label
-
-				# Create a mask for the region
-				minr, minc, maxr, maxc = local_bbox
-				region_mask = labels_array[i][minr:maxr, minc:maxc] == label
-
-				# Apply the mask to the image array to isolate the label
-				image_array = region_mask * label
-
-				# Convert local centroid coordinates to global coordinates
-				global_center_x = round(local_center[1] + patch_coord[0], 4)  # x-coordinate
-				global_center_y = round(local_center[0] + patch_coord[1], 4)  # y-coordinate
-
-				# Convert local bbox coordinates to global coordinates
-				global_bbox = (
-					local_bbox[0] + patch_coord[1],
-					local_bbox[1] + patch_coord[0],
-					local_bbox[2] + patch_coord[1],
-					local_bbox[3] + patch_coord[0]
-				)
-
-				# Add the area, global center, bbox, and image array to the list
-				region_info = {
-					'label': label,
-					'area': area,
-					'global_center': (global_center_x, global_center_y),
-					'bbox': global_bbox,
-					'image_array': image_array
-				}
-				region_info_list.append(region_info)
-
-
-	return region_info_list
-
-######################################################################################
-
-def reconstruct_patches(region_info_list, original_image):
-
-	# Determine the dimensions of the original image
-	original_image_shape = original_image.shape
-
-	# Initialize an empty array for the reconstructed image
-	reconstructed_image = np.zeros(original_image_shape, dtype=np.int16)
-
-	# Dictionary to keep track of the regions already placed in the reconstructed image
-	region_placements = {}
-	current_label = 1  # Initialize the label counter
-
-	# Loop over each region to place it back into the reconstructed image
-	for info in region_info_list:
-		minr, minc, maxr, maxc = info['bbox']
-		binary_image_array = info['image_array']
-
-		# Check if there is an overlap and resolve it
-		overlap = False
-		for i in range(minr, maxr):
-			for j in range(minc, maxc):
-				if binary_image_array[i - minr, j - minc] != 0:
-					if reconstructed_image[i, j] != 0:
-						overlap = True
-						break  # No need to check further if we found an overlap
-			if overlap:
-				break
-
-		# Decide which label to keep if there's an overlap
-		if overlap:
-			# Overwrite the entire area of the overlap with the new label
-			for i in range(minr, maxr):
-				for j in range(minc, maxc):
-					if binary_image_array[i - minr, j - minc] != 0:
-						label = region_placements.get((i, j), current_label)
-						reconstructed_image[i, j] = label
-						region_placements[(i, j)] = label
-		else:
-			# If there's no overlap, place the label and increment the label counter
-			label = current_label
-			current_label += 1
-			for i in range(minr, maxr):
-				for j in range(minc, maxc):
-					if binary_image_array[i - minr, j - minc] != 0:
-						reconstructed_image[i, j] = label
-						region_placements[(i, j)] = label
-
-	return reconstructed_image
+	# Check if the intersection is greater than the threshold
+	return intersection_area > overlapThresh * min(box1_area, box2_area)
 
 ######################################################################################
