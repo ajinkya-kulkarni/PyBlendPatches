@@ -45,24 +45,3 @@ Install these dependencies using pip:
 ```bash
 pip install numpy matplotlib tqdm scikit-image
 ```
-
-## Usage
-
-```
-# Your code to import modules and load images goes here
-
-# Create overlapping patches from the image
-patches, window_coords = patchify(image, window_size=256, overlap=128)
-
-# Predict segmentation for each patch
-predicted_labels = [your_segmentation_prediction_function(patch) for patch in patches]
-
-# Clean the segmentation borders on each patch
-cleaned_labels = [remove_border_labels(label, coord, normalized_image) for label, coord in zip(predicted_labels, window_coords)]
-
-# Reconstruct the segmented image from patches
-reconstructed_image = reconstruct_patches(cleaned_labels)
-
-# Visualize the results
-visualize_segmentation(image, reconstructed_image)
-```
