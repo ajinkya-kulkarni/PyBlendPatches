@@ -140,36 +140,41 @@ def patchify(image, window_size, overlap):
 
 ######################################################################################
 
-import matplotlib.pyplot as plt
+def remove_border_labels(label_image, patch_coords, original_image, neutral_value=0):
+	"""
+	Remove labels at the borders of the patch, unless the border is shared with the original image.
 
-def visualize_patches(windows, window_coords, which_cmap, file_path):
-	# Determine the number of unique x and y coordinates
-	unique_x = sorted(set(coord[0] for coord in window_coords))
-	unique_y = sorted(set(coord[1] for coord in window_coords))
+	Parameters:
+	- label_image: An array where each connected region is assigned a unique integer label.
+	- patch_coords: A tuple (x1, y1, x2, y2) indicating the coordinates of the patch within the original image.
+	- image_shape: The shape (height, width) of the original image.
+	- neutral_value: The value to assign to removed labels.
 
-	num_cols = len(unique_x)
-	num_rows = len(unique_y)
+	Returns:
+	- An array of the same shape as `label_image` with the appropriate border labels removed.
+	"""
+	x1, y1, x2, y2 = patch_coords
+	height, width = original_image.shape
+	border_labels = set()
 
-	# Create a figure with the calculated number of subplots
-	fig, axes = plt.subplots(num_rows, num_cols, figsize=(10, 10))
+	# Check each border and add labels to remove if not at the edge of the original image
+	if y1 != 0:
+		border_labels.update(label_image[0, :])
+	if y2 != height:
+		border_labels.update(label_image[-1, :])
+	if x1 != 0:
+		border_labels.update(label_image[:, 0])
+	if x2 != width:
+		border_labels.update(label_image[:, -1])
 
-	# Flatten the axes array for easy indexing
-	axes_flat = axes.flatten() if num_rows * num_cols > 1 else [axes]
+	# Create a mask of regions to remove
+	border_mask = np.isin(label_image, list(border_labels))
 
-	# Map each window to the correct position in the grid
-	for window, coord in zip(windows, window_coords):
-		row = unique_y.index(coord[1])
-		col = unique_x.index(coord[0])
-		ax = axes[row, col] if num_rows * num_cols > 1 else axes
-		ax.imshow(window, cmap=which_cmap)
-		ax.axis('off')  # Turn off axis
+	# Set the border labels to neutral_value (background)
+	cleaned_label_image = label_image.copy()
+	cleaned_label_image[border_mask] = neutral_value
 
-	# Turn off any unused subplots
-	for j in range(len(windows), num_rows*num_cols):
-		axes_flat[j].axis('off')
-
-	plt.savefig(file_path, dpi = 300, bbox_inches = 'tight')
-	plt.close()
+	return cleaned_label_image
 
 ######################################################################################
 
