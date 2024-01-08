@@ -221,3 +221,41 @@ def does_overlap(box1, box2, overlapThresh):
 	return intersection_area > overlapThresh * min(box1_area, box2_area)
 
 ######################################################################################
+
+def place_labels_on_canvas(normalized_img, nms_region_info_list):
+	"""
+	Places labels on a canvas with random decisions for overlapping areas.
+
+	Parameters:
+	normalized_img (numpy.ndarray): The base image used to determine the canvas size.
+	nms_region_info_list (list): List of dictionaries containing label info and bounding box.
+
+	Returns:
+	numpy.ndarray: The canvas with labels placed on it.
+	"""
+	canvas_height, canvas_width = normalized_img.shape
+	canvas = np.zeros((canvas_height, canvas_width), dtype=np.int16)
+
+	for label_info in nms_region_info_list:
+		bbox = label_info['global_bbox']
+		label_img = label_info['label_image']
+
+		start_x, start_y, end_x, end_y = bbox
+		height, width = label_img.shape[:2]
+
+		temp_canvas = np.zeros_like(canvas)
+		temp_canvas[start_y:start_y + height, start_x:start_x + width] = label_img
+
+		overlap_area = (canvas > 0) & (temp_canvas > 0)
+
+		for y in range(start_y, start_y + height):
+			for x in range(start_x, start_x + width):
+				if overlap_area[y, x]:
+					if np.random.rand() < 0.5:  # 50% chance
+						temp_canvas[y, x] = canvas[y, x]
+
+		canvas[temp_canvas > 0] = temp_canvas[temp_canvas > 0]
+
+	return canvas
+	
+######################################################################################
