@@ -1,3 +1,8 @@
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![DOI](https://zenodo.org/badge/715606775.svg)](https://zenodo.org/doi/10.5281/zenodo.10630720)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ajinkya-kulkarni/PyBlendPatches)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/ajinkya-kulkarni/PyBlendPatches)
+
 # PyBlendPatches - an Image Segmentation and Reconstruction Toolkit
 
 This toolkit is designed to facilitate semantic segmentation of large images by splitting them into smaller patches, performing segmentation on each individual patch, and then reconstructing these segmented patches into a single, large semantic segmentation map.
